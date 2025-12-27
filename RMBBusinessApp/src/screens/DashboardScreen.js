@@ -177,7 +177,7 @@ export default function DashboardScreen({ navigation }) {
   
     return (
       <View style={styles.container}>
-        <Text style={styles.title}> Exchange App</Text>
+        <Text style={styles.title}> MD's Business App</Text>
         <TouchableOpacity 
           style={styles.reloadButton}
           onPress={loadAllData}
@@ -187,7 +187,7 @@ export default function DashboardScreen({ navigation }) {
         
         {/* USD Rate Input */}
         <View style={styles.rateInputContainer}>
-          <Text style={styles.rateLabel}>$ Rate (BDT per $):</Text>
+          <Text style={styles.rateLabel}>$:</Text>
           <TextInput
             style={styles.rateInput}
             value={usdRate}
@@ -200,7 +200,7 @@ export default function DashboardScreen({ navigation }) {
         <ScrollView style={styles.scrollContainer}>
           {/* Customers Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>👥 Customers</Text>
+            <Text style={styles.sectionTitle}>Customers</Text>
             {balances.customers.map(customer => {
               const balance = typeof customer.balance === 'string' ? parseFloat(customer.balance) || 0 : customer.balance || 0;
               return (
@@ -221,7 +221,7 @@ export default function DashboardScreen({ navigation }) {
   
           {/* Suppliers Section - FIXED SIGN */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🏢 Suppliers</Text>
+            <Text style={styles.sectionTitle}>Suppliers</Text>
             {balances.suppliers.map(supplier => {
               const balanceUSD = typeof supplier.balanceUSD === 'string' ? parseFloat(supplier.balanceUSD) || 0 : supplier.balanceUSD || 0;
               const rate = parseFloat(usdRate) || 125;
@@ -250,7 +250,7 @@ export default function DashboardScreen({ navigation }) {
   
           {/* DHS Agents Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🤝 DHS Agents</Text>
+            <Text style={styles.sectionTitle}>Agents</Text>
             {balances.agents.map(agent => {
               const balance = typeof agent.balance === 'string' ? parseFloat(agent.balance) || 0 : agent.balance || 0;
               return (
@@ -271,7 +271,7 @@ export default function DashboardScreen({ navigation }) {
   
           {/* Banks Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>🏦 Banks</Text>
+            <Text style={styles.sectionTitle}>Others</Text>
             {balances.banks.map(bank => {
               const balance = typeof bank.balance === 'string' ? parseFloat(bank.balance) || 0 : bank.balance || 0;
               return (
@@ -291,7 +291,7 @@ export default function DashboardScreen({ navigation }) {
   
           {/* USDT Wallets Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>💳 USDT Wallets</Text>
+            <Text style={styles.sectionTitle}>TRC</Text>
             {balances.wallets.map(wallet => {
               const balanceUSD = typeof wallet.balanceUSD === 'string' ? parseFloat(wallet.balanceUSD) || 0 : wallet.balanceUSD || 0;
               const rate = parseFloat(usdRate) || 125;
@@ -315,7 +315,7 @@ export default function DashboardScreen({ navigation }) {
   
           {/* Final Summary - FIXED CALCULATION */}
           <View style={[styles.section, styles.totalSection]}>
-            <Text style={styles.totalTitle}>💰 YOUR TOTAL MONEY</Text>
+            <Text style={styles.totalTitle}>TOTAL</Text>
             
             <View style={styles.calculationBreakdown}>
               <Text style={styles.calculationLine}>
@@ -325,10 +325,10 @@ export default function DashboardScreen({ navigation }) {
                 Agents: {formatCurrency(summary.totalAgentsBDT)}
               </Text>
               <Text style={styles.calculationLine}>
-                Banks: {formatCurrency(summary.totalBanksBDT)}
+                Others: {formatCurrency(summary.totalBanksBDT)}
               </Text>
               <Text style={styles.calculationLine}>
-                Wallets: {formatCurrency(summary.totalWalletsBDT)}
+                Trc: {formatCurrency(summary.totalWalletsBDT)}
               </Text>
               <Text style={styles.calculationLine}>
                 Suppliers: {formatCurrency(summary.totalSuppliersBDT)}

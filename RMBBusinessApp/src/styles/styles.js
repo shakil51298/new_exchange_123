@@ -5,7 +5,7 @@ import { StyleSheet } from 'react-native';
 const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: '#f5f5f5',
+      backgroundColor: '#f5f5f9',
     },
     title: {
       fontSize: 24,
@@ -13,7 +13,7 @@ const styles = StyleSheet.create({
       textAlign: 'center',
       marginTop: 10,
       marginBottom: 10,
-      color: '#333',
+      color: '#f5f',
     },
     screenTitle: {
       fontSize: 22,
