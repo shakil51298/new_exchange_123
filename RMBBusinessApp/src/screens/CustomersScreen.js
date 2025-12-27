@@ -11,7 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
@@ -81,12 +81,9 @@ export default function CustomersScreen({ navigation }) {
       collection(db, 'customers'),
       async (snapshot) => {
         const list = [];
-        snapshot.forEach((d) => {
-          list.push({ id: d.id, ...d.data() });
-        });
+        snapshot.forEach((d) => list.push({ id: d.id, ...d.data() }));
         const sorted = sortCustomers(list);
         setCustomers(sorted);
-        // offline backup
         AsyncStorage.setItem('customers', JSON.stringify(sorted));
       },
       async (error) => {
@@ -98,7 +95,7 @@ export default function CustomersScreen({ navigation }) {
     return () => unsubscribe();
   }, [loadCustomersFromStorage, sortCustomers]);
 
-  // -------- Pull-to-refresh --------
+  // ✅ Pull-to-refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -112,7 +109,7 @@ export default function CustomersScreen({ navigation }) {
     }
   }, [fetchCustomersOnce, loadCustomersFromStorage]);
 
-  // -------- Filter (derived) --------
+  // -------- Filter --------
   const filteredCustomers = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return customers;
@@ -170,7 +167,7 @@ export default function CustomersScreen({ navigation }) {
         const docRef = await addDoc(collection(db, 'customers'), customerData);
         const realCustomer = { id: docRef.id, ...customerData };
 
-        // Replace temp item only (the one we just added)
+        // Replace temp item
         const finalList = updatedCustomers.map(c =>
           typeof c.id === 'string' && c.id.startsWith('temp_') ? realCustomer : c
         );
@@ -186,7 +183,6 @@ export default function CustomersScreen({ navigation }) {
       setCurrentCustomer({ id: '', name: '', phone: '', balance: '0' });
     } catch (error) {
       console.error('Error saving customer:', error);
-      // Keep local changes, but tell user
       Alert.alert('Saved locally', 'Could not sync to cloud. Saved to device storage.');
       setModalVisible(false);
       setCurrentCustomer({ id: '', name: '', phone: '', balance: '0' });
@@ -234,17 +230,10 @@ export default function CustomersScreen({ navigation }) {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.screenTitle}>👥 Customer Management</Text>
+        <Text style={styles.screenTitle}>Customer Management</Text>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          {/* Optional: keep refresh icon too (same vibe as CustomerDetails) */}
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={onRefresh}
-            disabled={refreshing}
-          >
-            <Icon name="refresh" size={20} color="#007AFF" />
-          </TouchableOpacity>
+          {/* ✅ Dashboard style icon */}
 
           <TouchableOpacity
             style={styles.addButton}
@@ -253,14 +242,14 @@ export default function CustomersScreen({ navigation }) {
               setModalVisible(true);
             }}
           >
-            <Icon name="add" size={24} color="white" />
+            <Icon name="plus" size={24} color="white" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Search Bar */}
+      {/* Search */}
       <View style={styles.searchContainer}>
-        <Icon name="search" size={20} color="#666" style={styles.searchIcon} />
+        <Icon name="magnify" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search customers by name or phone..."
@@ -275,7 +264,7 @@ export default function CustomersScreen({ navigation }) {
         )}
       </View>
 
-      {/* Customer Count */}
+      {/* Count */}
       <View style={styles.customerCountContainer}>
         <Text style={styles.customerCountText}>
           {filteredCustomers.length} customer{filteredCustomers.length !== 1 ? 's' : ''}
@@ -284,13 +273,11 @@ export default function CustomersScreen({ navigation }) {
         <Text style={styles.sortText}>Sorted by: Last Updated</Text>
       </View>
 
-      {/* ✅ Pull-to-refresh added here */}
+      {/* ✅ Pull-to-refresh list */}
       <FlatList
         data={filteredCustomers}
         keyExtractor={(item) => item.id}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         renderItem={({ item, index }) => (
           <TouchableOpacity
             style={styles.listCard}
@@ -322,14 +309,14 @@ export default function CustomersScreen({ navigation }) {
                     setModalVisible(true);
                   }}
                 >
-                  <Icon name="edit" size={18} color="#007AFF" />
+                  <Icon name="pencil" size={18} color="#007AFF" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.actionButton}
                   onPress={() => deleteCustomer(item.id)}
                 >
-                  <Icon name="delete" size={18} color="#FF3B30" />
+                  <Icon name="trash-can-outline" size={18} color="#FF3B30" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -348,8 +335,8 @@ export default function CustomersScreen({ navigation }) {
                   item.balance > 0
                     ? styles.positiveBalance
                     : item.balance < 0
-                    ? styles.negativeBalance
-                    : styles.neutralBalance,
+                      ? styles.negativeBalance
+                      : styles.neutralBalance,
                 ]}
               >
                 Balance: {formatCurrency(item.balance)}
@@ -362,15 +349,15 @@ export default function CustomersScreen({ navigation }) {
                     item.balance > 0
                       ? styles.positiveStatus
                       : item.balance < 0
-                      ? styles.negativeStatus
-                      : styles.neutralStatus,
+                        ? styles.negativeStatus
+                        : styles.neutralStatus,
                   ]}
                 >
                   {item.balance > 0
                     ? 'You owe customer'
                     : item.balance < 0
-                    ? 'Customer owes you'
-                    : 'Settled'}
+                      ? 'Customer owes you'
+                      : 'Settled'}
                 </Text>
               </View>
             </View>
@@ -378,7 +365,7 @@ export default function CustomersScreen({ navigation }) {
         )}
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Icon name="people-outline" size={64} color="#ccc" />
+            <Icon name="account-group" size={64} color="#ccc" />
             <Text style={styles.emptyStateText}>
               {searchQuery ? 'No customers found' : 'No customers yet'}
             </Text>
@@ -389,7 +376,7 @@ export default function CustomersScreen({ navigation }) {
         }
       />
 
-      {/* Add/Edit Customer Modal */}
+      {/* Add/Edit Modal */}
       <Modal
         animationType="slide"
         transparent
@@ -436,15 +423,15 @@ export default function CustomersScreen({ navigation }) {
                     parseFloat(currentCustomer.balance) > 0
                       ? styles.positiveBalance
                       : parseFloat(currentCustomer.balance) < 0
-                      ? styles.negativeBalance
-                      : styles.neutralBalance,
+                        ? styles.negativeBalance
+                        : styles.neutralBalance,
                   ]}
                 >
                   {parseFloat(currentCustomer.balance) > 0
                     ? 'You will owe customer'
                     : parseFloat(currentCustomer.balance) < 0
-                    ? 'Customer will owe you'
-                    : 'Settled'}
+                      ? 'Customer will owe you'
+                      : 'Settled'}
                 </Text>
               </View>
             ) : null}

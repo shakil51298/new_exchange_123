@@ -11,7 +11,8 @@ import {
   Platform,
 } from 'react-native';
 
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {

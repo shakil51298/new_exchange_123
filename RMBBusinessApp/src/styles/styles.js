@@ -473,11 +473,7 @@ const styles = StyleSheet.create({
       fontSize: 16,
     },
     
-    // Sub Sections
-    subSection: {
-      marginBottom: 20,
-      paddingHorizontal: 16,
-    },
+
     subSectionHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
