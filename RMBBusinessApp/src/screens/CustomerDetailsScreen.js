@@ -9,10 +9,10 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 
 import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
@@ -64,10 +64,12 @@ function BankPickerModal({
             height: '80%',
           }}
         >
-          {/* Header */}
           <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 16, fontWeight: '800' }}>Select Bank</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="bank" size={18} color="#111" />
+                <Text style={{ fontSize: 16, fontWeight: '800' }}>Select Bank</Text>
+              </View>
 
               <TouchableOpacity onPress={onClose} style={{ padding: 6 }}>
                 <Icon name="close" size={22} color="#111" />
@@ -85,7 +87,6 @@ function BankPickerModal({
             />
           </View>
 
-          {/* Big list (virtualized properly) */}
           <FlatList
             data={filtered}
             keyExtractor={(i) => i.id}
@@ -138,6 +139,17 @@ export default function CustomerDetailsScreen({ route }) {
 
   const [refreshing, setRefreshing] = useState(false);
 
+  // ✅ Working spinner state
+  const [isWorking, setIsWorking] = useState(false);
+  const [workingLabel, setWorkingLabel] = useState('Processing...');
+
+  const showWorking = (label = 'Processing...') => {
+    setWorkingLabel(label);
+    setIsWorking(true);
+  };
+
+  const hideWorking = () => setIsWorking(false);
+
   // ----- Order Modal -----
   const [orderModalVisible, setOrderModalVisible] = useState(false);
   const [supplierDropdownOpen, setSupplierDropdownOpen] = useState(false);
@@ -156,7 +168,6 @@ export default function CustomerDetailsScreen({ route }) {
   // ----- Payment Modal -----
   const [paymentModalVisible, setPaymentModalVisible] = useState(false);
 
-  // ✅ bank picker modal (big list safe)
   const [bankPickerVisible, setBankPickerVisible] = useState(false);
   const [bankSearch, setBankSearch] = useState('');
 
@@ -166,6 +177,32 @@ export default function CustomerDetailsScreen({ route }) {
     bankName: '',
     date: getTodayDate(),
     notes: '',
+  });
+
+  // ----- Edit Modal -----
+  const [editModalVisible, setEditModalVisible] = useState(false);
+
+  const [editingTx, setEditingTx] = useState({
+    id: '',
+    type: '',
+    date: getTodayDate(),
+    notes: '',
+
+    // order fields
+    supplierId: '',
+    supplierName: '',
+    supplierTransactionId: '',
+    rmbAmount: '',
+    customerRmbRate: '',
+    supplierRate: '',
+    billBDT: 0,
+    supplierAmountUSD: 0,
+
+    // payment fields
+    bankId: '',
+    bankName: '',
+    bankTransactionId: '',
+    amount: '',
   });
 
   // ---------- Loaders ----------
@@ -198,7 +235,6 @@ export default function CustomerDetailsScreen({ route }) {
     try {
       const snap = await getDocs(collection(db, 'suppliers'));
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Keep flexible: show RMB suppliers or suppliers without type
       setSuppliers(list.filter(s => s.type === 'RMB' || !s.type));
     } catch (e) {
       console.error('Error loading suppliers:', e);
@@ -223,24 +259,11 @@ export default function CustomerDetailsScreen({ route }) {
 
   // ---------- Calculations (Order) ----------
   const rmbAmountNum = useMemo(() => parseFloat(newOrder.rmbAmount) || 0, [newOrder.rmbAmount]);
-  const customerRateNum = useMemo(
-    () => parseFloat(newOrder.customerRmbRate) || 0,
-    [newOrder.customerRmbRate]
-  );
-  const supplierRateNum = useMemo(
-    () => parseFloat(newOrder.supplierRate) || 0,
-    [newOrder.supplierRate]
-  );
+  const customerRateNum = useMemo(() => parseFloat(newOrder.customerRmbRate) || 0, [newOrder.customerRmbRate]);
+  const supplierRateNum = useMemo(() => parseFloat(newOrder.supplierRate) || 0, [newOrder.supplierRate]);
 
-  const customerBillBDT = useMemo(
-    () => rmbAmountNum * customerRateNum,
-    [rmbAmountNum, customerRateNum]
-  );
-
-  const supplierBillUSD = useMemo(
-    () => (supplierRateNum > 0 ? rmbAmountNum / supplierRateNum : 0),
-    [rmbAmountNum, supplierRateNum]
-  );
+  const customerBillBDT = useMemo(() => rmbAmountNum * customerRateNum, [rmbAmountNum, customerRateNum]);
+  const supplierBillUSD = useMemo(() => (supplierRateNum > 0 ? rmbAmountNum / supplierRateNum : 0), [rmbAmountNum, supplierRateNum]);
 
   const canSubmitOrder = useMemo(
     () => rmbAmountNum > 0 && customerRateNum > 0 && !!newOrder.supplierId && supplierRateNum > 0,
@@ -255,11 +278,7 @@ export default function CustomerDetailsScreen({ route }) {
 
   // ---------- Calculations (Payment) ----------
   const paymentAmountNum = useMemo(() => parseFloat(newPayment.amount) || 0, [newPayment.amount]);
-
-  const canSubmitPayment = useMemo(
-    () => paymentAmountNum > 0 && !!newPayment.bankId,
-    [paymentAmountNum, newPayment.bankId]
-  );
+  const canSubmitPayment = useMemo(() => paymentAmountNum > 0 && !!newPayment.bankId, [paymentAmountNum, newPayment.bankId]);
 
   // ---------- Reset Helpers ----------
   const resetNewOrderForm = () => {
@@ -287,7 +306,7 @@ export default function CustomerDetailsScreen({ route }) {
     setBankSearch('');
   };
 
-  // ---------- Stylish Buttons (no new file) ----------
+  // ---------- Stylish Buttons ----------
   const fancyBtn = {
     height: 46,
     borderRadius: 12,
@@ -317,29 +336,27 @@ export default function CustomerDetailsScreen({ route }) {
   const btnTextDark = { fontWeight: '800', color: '#111', fontSize: 14 };
   const btnTextLight = { fontWeight: '800', color: 'white', fontSize: 14 };
 
-  // ---------- ✅ ORDER: Dual transaction (Customer + Supplier) ----------
+  // ---------- ORDER create ----------
   const createOrderDual = async () => {
+    if (isWorking) return;
     if (!canSubmitOrder) {
       Alert.alert('Missing info', 'Enter RMB amount, customer rate, select supplier, and supplier rate.');
       return;
     }
 
+    showWorking('Saving order...');
     try {
       const timestamp = new Date().toISOString();
 
-      // 1) Supplier transaction (BILL)
       const supplierTxPayload = {
         type: 'bill',
         supplierId: newOrder.supplierId,
         supplierName: newOrder.supplierName,
-
         rmbAmount: rmbAmountNum,
-        rate: supplierRateNum, // RMB per $
+        rate: supplierRateNum,
         amountUSD: supplierBillUSD,
-
         customerId: customer.id,
         customerName: customer.name,
-
         notes: newOrder.notes || '',
         date: newOrder.date || getTodayDate(),
         timestamp,
@@ -352,7 +369,6 @@ export default function CustomerDetailsScreen({ route }) {
         supplierTxPayload
       );
 
-      // 2) Customer transaction (ORDER)
       const customerTxPayload = {
         type: 'order',
         customerId: customer.id,
@@ -380,7 +396,6 @@ export default function CustomerDetailsScreen({ route }) {
         customerTxPayload
       );
 
-      // 3) Atomic balance updates
       await updateDoc(doc(db, 'customers', customer.id), {
         balance: increment(customerBillBDT),
         updatedAt: getTodayDate(),
@@ -391,7 +406,6 @@ export default function CustomerDetailsScreen({ route }) {
         updatedAt: getTodayDate(),
       });
 
-      // 4) Update local UI instantly
       setCustomerData(prev => ({
         ...prev,
         balance: (parseFloat(prev.balance) || 0) + customerBillBDT,
@@ -408,23 +422,26 @@ export default function CustomerDetailsScreen({ route }) {
     } catch (e) {
       console.error('Create order failed:', e);
       Alert.alert('Error', e?.message || 'Failed to create order');
+    } finally {
+      hideWorking();
     }
   };
 
-  // ---------- ✅ PAYMENT: Dual transaction (Customer + Bank) ----------
+  // ---------- PAYMENT create ----------
   const receivePaymentDual = async () => {
+    if (isWorking) return;
     if (!canSubmitPayment) {
       Alert.alert('Missing info', 'Enter amount and select a bank.');
       return;
     }
 
+    showWorking('Saving payment...');
     try {
       const timestamp = new Date().toISOString();
       const amount = paymentAmountNum;
 
-      // 1) Bank CREDIT transaction
       const bankTxPayload = {
-        type: 'credit', // (or "deposit")
+        type: 'credit',
         amount,
         customerId: customer.id,
         customerName: customer.name,
@@ -439,14 +456,12 @@ export default function CustomerDetailsScreen({ route }) {
         bankTxPayload
       );
 
-      // 2) Customer PAYMENT transaction (debit)
       const customerTxPayload = {
         type: 'payment',
         amount,
         bankId: newPayment.bankId,
         bankName: newPayment.bankName,
         bankTransactionId: bankTxRef.id,
-
         notes: newPayment.notes || '',
         date: newPayment.date || getTodayDate(),
         timestamp,
@@ -458,7 +473,6 @@ export default function CustomerDetailsScreen({ route }) {
         customerTxPayload
       );
 
-      // 3) Atomic balances
       await updateDoc(doc(db, 'customers', customer.id), {
         balance: increment(-amount),
         updatedAt: getTodayDate(),
@@ -469,7 +483,6 @@ export default function CustomerDetailsScreen({ route }) {
         updatedAt: getTodayDate(),
       });
 
-      // 4) Update local UI
       setCustomerData(prev => ({
         ...prev,
         balance: (parseFloat(prev.balance) || 0) - amount,
@@ -486,26 +499,220 @@ export default function CustomerDetailsScreen({ route }) {
     } catch (e) {
       console.error('Receive payment failed:', e);
       Alert.alert('Error', e?.message || 'Failed to save payment');
+    } finally {
+      hideWorking();
     }
   };
 
-  // ---------- Delete (customer tx + linked tx rollback) ----------
-  const deleteTransaction = (tx) => {
+  // ---------- EDIT ----------
+  const openEdit = (tx) => {
+    setEditingTx({
+      id: tx.id,
+      type: tx.type,
+      date: tx.date || getTodayDate(),
+      notes: tx.notes || '',
+
+      supplierId: tx.supplierId || '',
+      supplierName: tx.supplierName || '',
+      supplierTransactionId: tx.supplierTransactionId || '',
+      rmbAmount: (tx.rmbAmount ?? '').toString(),
+      customerRmbRate: (tx.customerRmbRate ?? '').toString(),
+      supplierRate: (tx.supplierRate ?? '').toString(),
+      billBDT: parseFloat(tx.billBDT || 0),
+      supplierAmountUSD: parseFloat(tx.supplierAmountUSD || 0),
+
+      bankId: tx.bankId || '',
+      bankName: tx.bankName || '',
+      bankTransactionId: tx.bankTransactionId || '',
+      amount: (tx.amount ?? '').toString(),
+    });
+    setEditModalVisible(true);
+  };
+
+  const saveEdit = async () => {
+    if (isWorking) return;
+    showWorking('Updating transaction...');
+
+    try {
+      if (!editingTx.id || !editingTx.type) return;
+
+      if (editingTx.type === 'order') {
+        const newRmb = parseFloat(editingTx.rmbAmount) || 0;
+        const newCustomerRate = parseFloat(editingTx.customerRmbRate) || 0;
+        const newSupplierRate = parseFloat(editingTx.supplierRate) || 0;
+
+        if (newRmb <= 0 || newCustomerRate <= 0 || newSupplierRate <= 0) {
+          Alert.alert('Error', 'Please enter valid RMB amount, customer rate, and supplier rate.');
+          return;
+        }
+        if (!editingTx.supplierId || !editingTx.supplierTransactionId) {
+          Alert.alert('Error', 'Linked supplier transaction missing. (Cannot edit this order safely)');
+          return;
+        }
+
+        const oldBillBDT = parseFloat(editingTx.billBDT || 0);
+        const oldSupplierUSD = parseFloat(editingTx.supplierAmountUSD || 0);
+
+        const newBillBDT = newRmb * newCustomerRate;
+        const newSupplierUSD = newSupplierRate > 0 ? newRmb / newSupplierRate : 0;
+
+        const deltaCustomerBDT = newBillBDT - oldBillBDT;
+        const deltaSupplierUSD = newSupplierUSD - oldSupplierUSD;
+
+        await updateDoc(doc(db, `customers/${customer.id}/transactions`, editingTx.id), {
+          rmbAmount: newRmb,
+          customerRmbRate: newCustomerRate,
+          billBDT: newBillBDT,
+          supplierRate: newSupplierRate,
+          supplierAmountUSD: newSupplierUSD,
+          notes: editingTx.notes || '',
+          date: editingTx.date || getTodayDate(),
+        });
+
+        await updateDoc(
+          doc(db, `suppliers/${editingTx.supplierId}/transactions`, editingTx.supplierTransactionId),
+          {
+            rmbAmount: newRmb,
+            rate: newSupplierRate,
+            amountUSD: newSupplierUSD,
+            notes: editingTx.notes || '',
+            date: editingTx.date || getTodayDate(),
+            calculation: `${newRmb} RMB ÷ ${newSupplierRate} = ${newSupplierUSD.toFixed(2)} USD`,
+          }
+        );
+
+        await updateDoc(doc(db, 'customers', customer.id), {
+          balance: increment(deltaCustomerBDT),
+          updatedAt: getTodayDate(),
+        });
+
+        await updateDoc(doc(db, 'suppliers', editingTx.supplierId), {
+          balanceUSD: increment(deltaSupplierUSD),
+          updatedAt: getTodayDate(),
+        });
+
+        setCustomerData(prev => ({
+          ...prev,
+          balance: (parseFloat(prev.balance) || 0) + deltaCustomerBDT,
+        }));
+
+        const next = transactions.map(t => {
+          if (t.id !== editingTx.id) return t;
+          return {
+            ...t,
+            rmbAmount: newRmb,
+            customerRmbRate: newCustomerRate,
+            billBDT: newBillBDT,
+            supplierRate: newSupplierRate,
+            supplierAmountUSD: newSupplierUSD,
+            notes: editingTx.notes || '',
+            date: editingTx.date || getTodayDate(),
+          };
+        });
+
+        next.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setTransactions(next);
+        await AsyncStorage.setItem(`transactions_${customer.id}`, JSON.stringify(next));
+
+        Alert.alert('Success', 'Order updated (Customer + Supplier).');
+        setEditModalVisible(false);
+        return;
+      }
+
+      if (editingTx.type === 'payment') {
+        const newAmt = parseFloat(editingTx.amount) || 0;
+        if (newAmt <= 0) {
+          Alert.alert('Error', 'Enter a valid payment amount.');
+          return;
+        }
+        if (!editingTx.bankId || !editingTx.bankTransactionId) {
+          Alert.alert('Error', 'Linked bank transaction missing. (Cannot edit this payment safely)');
+          return;
+        }
+
+        const original = transactions.find(t => t.id === editingTx.id);
+        const oldAmt = parseFloat(original?.amount || 0);
+
+        const delta = newAmt - oldAmt;
+        const deltaCustomerBDT = -delta;
+        const deltaBankBDT = delta;
+
+        await updateDoc(doc(db, `customers/${customer.id}/transactions`, editingTx.id), {
+          amount: newAmt,
+          notes: editingTx.notes || '',
+          date: editingTx.date || getTodayDate(),
+        });
+
+        await updateDoc(
+          doc(db, `banks/${editingTx.bankId}/transactions`, editingTx.bankTransactionId),
+          {
+            amount: newAmt,
+            notes: editingTx.notes || '',
+            date: editingTx.date || getTodayDate(),
+          }
+        );
+
+        await updateDoc(doc(db, 'customers', customer.id), {
+          balance: increment(deltaCustomerBDT),
+          updatedAt: getTodayDate(),
+        });
+
+        await updateDoc(doc(db, 'banks', editingTx.bankId), {
+          balance: increment(deltaBankBDT),
+          updatedAt: getTodayDate(),
+        });
+
+        setCustomerData(prev => ({
+          ...prev,
+          balance: (parseFloat(prev.balance) || 0) + deltaCustomerBDT,
+        }));
+
+        const next = transactions.map(t => {
+          if (t.id !== editingTx.id) return t;
+          return {
+            ...t,
+            amount: newAmt,
+            notes: editingTx.notes || '',
+            date: editingTx.date || getTodayDate(),
+          };
+        });
+
+        next.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setTransactions(next);
+        await AsyncStorage.setItem(`transactions_${customer.id}`, JSON.stringify(next));
+
+        Alert.alert('Success', 'Payment updated (Customer + Bank).');
+        setEditModalVisible(false);
+        return;
+      }
+
+      Alert.alert('Error', 'Only ORDER and PAYMENT can be edited.');
+    } catch (e) {
+      console.error('Edit save failed:', e);
+      Alert.alert('Error', e?.message || 'Failed to update transaction');
+    } finally {
+      hideWorking();
+    }
+  };
+
+  // ---------- DELETE ----------
+  const deleteTransactionUI = (tx) => {
+    if (isWorking) return;
+
     Alert.alert('Delete Transaction', 'Are you sure you want to delete this transaction?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          showWorking('Deleting...');
           try {
-            // delete customer tx
             await deleteDoc(doc(db, `customers/${customer.id}/transactions`, tx.id));
 
             if (tx.type === 'order' && tx.supplierId && tx.supplierTransactionId) {
-              // delete linked supplier tx + rollback supplier balance
               await deleteDoc(doc(db, `suppliers/${tx.supplierId}/transactions`, tx.supplierTransactionId));
-              const usd = parseFloat(tx.supplierAmountUSD) || 0;
 
+              const usd = parseFloat(tx.supplierAmountUSD) || 0;
               await updateDoc(doc(db, 'suppliers', tx.supplierId), {
                 balanceUSD: increment(-usd),
                 updatedAt: getTodayDate(),
@@ -524,10 +731,9 @@ export default function CustomerDetailsScreen({ route }) {
             }
 
             if (tx.type === 'payment' && tx.bankId && tx.bankTransactionId) {
-              // delete linked bank tx + rollback bank balance
               await deleteDoc(doc(db, `banks/${tx.bankId}/transactions`, tx.bankTransactionId));
-              const amt = parseFloat(tx.amount) || 0;
 
+              const amt = parseFloat(tx.amount) || 0;
               await updateDoc(doc(db, 'banks', tx.bankId), {
                 balance: increment(-amt),
                 updatedAt: getTodayDate(),
@@ -554,19 +760,53 @@ export default function CustomerDetailsScreen({ route }) {
           } catch (e) {
             console.error('Delete failed:', e);
             Alert.alert('Error', e?.message || 'Delete failed');
+          } finally {
+            hideWorking();
           }
         },
       },
     ]);
   };
 
-  // ---------- UI ----------
+  const TxTypeBadge = ({ type }) => {
+    const isOrder = type === 'order';
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Icon
+          name={isOrder ? 'package-variant-closed' : 'cash-check'}
+          size={16}
+          color={isOrder ? '#FF9500' : '#34C759'}
+        />
+        <Text style={styles.transactionTypeText}>{isOrder ? 'ORDER' : 'PAYMENT'}</Text>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
+      {/* ✅ Global Spinner Overlay */}
+      <Modal visible={isWorking} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ backgroundColor: 'white', padding: 18, borderRadius: 14, width: '75%', alignItems: 'center' }}>
+            <ActivityIndicator size="large" />
+            <Text style={{ marginTop: 12, fontWeight: '800', color: '#111' }}>{workingLabel}</Text>
+            <Text style={{ marginTop: 6, fontSize: 12, color: '#777', textAlign: 'center' }}>
+              Please wait…
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
       {/* Header */}
       <View style={styles.customerHeader}>
         <Text style={styles.customerName}>{customerData.name}</Text>
-        {customerData.phone ? <Text style={styles.customerContact}>📱 {customerData.phone}</Text> : null}
+
+        {customerData.phone ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+            <Icon name="phone" size={14} color="#666" />
+            <Text style={styles.customerContact}>{customerData.phone}</Text>
+          </View>
+        ) : null}
 
         <View
           style={[
@@ -592,29 +832,31 @@ export default function CustomerDetailsScreen({ route }) {
         </View>
       </View>
 
-      {/* Action Buttons (you already have styles for these in your main styles file) */}
+      {/* Action Buttons */}
       <View style={styles.actionButtons}>
         <TouchableOpacity
-          style={[styles.actionButtonLarge, styles.orderButton]}
+          disabled={isWorking}
+          style={[styles.actionButtonLarge, styles.orderButton, isWorking ? { opacity: 0.6 } : null]}
           onPress={() => setOrderModalVisible(true)}
         >
-          <Icon name="add-shopping-cart" size={24} color="white" />
+          <Icon name="cart-plus" size={22} color="white" />
           <Text style={styles.actionButtonText}>New Order</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.actionButtonLarge, styles.paymentButton]}
+          disabled={isWorking}
+          style={[styles.actionButtonLarge, styles.paymentButton, isWorking ? { opacity: 0.6 } : null]}
           onPress={() => setPaymentModalVisible(true)}
         >
-          <Icon name="payment" size={24} color="white" />
+          <Icon name="cash-plus" size={22} color="white" />
           <Text style={styles.actionButtonText}>Receive Payment</Text>
         </TouchableOpacity>
       </View>
 
       {/* History header */}
       <View style={styles.transactionHeader}>
-        <Text style={styles.sectionTitle}>📅 Transaction History</Text>
-        <TouchableOpacity onPress={onRefresh} style={styles.refreshButton}>
+        <Text style={styles.sectionTitle}>Transaction History</Text>
+        <TouchableOpacity disabled={isWorking} onPress={onRefresh} style={styles.refreshButton}>
           <Icon name="refresh" size={18} color="#007AFF" />
         </TouchableOpacity>
       </View>
@@ -629,28 +871,40 @@ export default function CustomerDetailsScreen({ route }) {
           <View style={styles.transactionCard}>
             <View style={styles.transactionHeaderRow}>
               <View style={styles.transactionTypeBadge}>
-                <Text style={styles.transactionTypeText}>
-                  {item.type === 'order' ? '📦 ORDER' : item.type === 'payment' ? '💵 PAYMENT' : 'TX'}
-                </Text>
+                <TxTypeBadge type={item.type} />
                 <Text style={styles.transactionIndex}>#{index + 1}</Text>
               </View>
 
               <View style={styles.transactionActions}>
+                {(item.type === 'order' || item.type === 'payment') && (
+                  <TouchableOpacity
+                    disabled={isWorking}
+                    style={[styles.smallEditButton, isWorking ? { opacity: 0.5 } : null]}
+                    onPress={() => openEdit(item)}
+                  >
+                    <Icon name="pencil" size={16} color="#007AFF" />
+                  </TouchableOpacity>
+                )}
+
                 <TouchableOpacity
-                  style={styles.smallDeleteButton}
-                  onPress={() => deleteTransaction(item)}
+                  disabled={isWorking}
+                  style={[styles.smallDeleteButton, isWorking ? { opacity: 0.5 } : null]}
+                  onPress={() => deleteTransactionUI(item)}
                 >
-                  <Icon name="delete" size={16} color="#FF3B30" />
+                  <Icon name="trash-can-outline" size={16} color="#FF3B30" />
                 </TouchableOpacity>
               </View>
             </View>
 
-            <Text style={styles.transactionDate}>
-              📅 {item.date || ''} • 🕒{' '}
-              {item.timestamp
-                ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                : ''}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <Icon name="calendar" size={14} color="#666" />
+              <Text style={styles.transactionDate}>
+                {item.date || ''} •{' '}
+                {item.timestamp
+                  ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                  : ''}
+              </Text>
+            </View>
 
             {item.type === 'order' ? (
               <View style={styles.transactionDetails}>
@@ -680,7 +934,10 @@ export default function CustomerDetailsScreen({ route }) {
 
                 {item.notes ? (
                   <View style={styles.notesContainer}>
-                    <Text style={styles.notesLabel}>Note:</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Icon name="note-text-outline" size={14} color="#666" />
+                      <Text style={styles.notesLabel}>Note:</Text>
+                    </View>
                     <Text style={styles.notesText}>{item.notes}</Text>
                   </View>
                 ) : null}
@@ -703,7 +960,10 @@ export default function CustomerDetailsScreen({ route }) {
 
                 {item.notes ? (
                   <View style={styles.notesContainer}>
-                    <Text style={styles.notesLabel}>Note:</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Icon name="note-text-outline" size={14} color="#666" />
+                      <Text style={styles.notesLabel}>Note:</Text>
+                    </View>
                     <Text style={styles.notesText}>{item.notes}</Text>
                   </View>
                 ) : null}
@@ -722,7 +982,7 @@ export default function CustomerDetailsScreen({ route }) {
         }
       />
 
-      {/* ---------------- New Order Modal ---------------- */}
+      {/* New Order Modal */}
       <Modal
         visible={orderModalVisible}
         animationType="slide"
@@ -782,7 +1042,7 @@ export default function CustomerDetailsScreen({ route }) {
                       {newOrder.supplierName ? newOrder.supplierName : 'Tap to choose supplier'}
                     </Text>
                     <Icon
-                      name={supplierDropdownOpen ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                      name={supplierDropdownOpen ? 'chevron-up' : 'chevron-down'}
                       size={22}
                       color="#555"
                     />
@@ -835,11 +1095,6 @@ export default function CustomerDetailsScreen({ route }) {
                               <Text style={{ fontWeight: '800', color: '#111' }}>
                                 {item.name || 'Unnamed Supplier'}
                               </Text>
-                              {!!item.type && (
-                                <Text style={{ fontSize: 11, color: '#777', marginTop: 2 }}>
-                                  Type: {item.type}
-                                </Text>
-                              )}
                             </TouchableOpacity>
                           )}
                           ListEmptyComponent={<Text style={{ color: '#777', paddingVertical: 10 }}>No suppliers found</Text>}
@@ -873,28 +1128,17 @@ export default function CustomerDetailsScreen({ route }) {
                       <Text style={styles.label}>Customer Bill (BDT)</Text>
                       <Text style={styles.value}>{formatCurrency(customerBillBDT)}</Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: '#777', marginTop: 4 }}>
-                      {rmbAmountNum} RMB × {customerRateNum} = {customerBillBDT.toFixed(2)} BDT
-                    </Text>
 
                     <View style={[styles.row, { marginTop: 12 }]}>
                       <Text style={styles.label}>Supplier Bill (USD)</Text>
                       <Text style={styles.value}>{formatUSD(supplierBillUSD)}</Text>
                     </View>
-                    <Text style={{ fontSize: 11, color: '#777', marginTop: 4 }}>
-                      {rmbAmountNum} RMB ÷ {supplierRateNum || 0} = {supplierBillUSD.toFixed(2)} USD
-                    </Text>
-
-                    {!!newOrder.supplierName && (
-                      <Text style={{ fontSize: 11, color: '#777', marginTop: 10 }}>
-                        Supplier: {newOrder.supplierName}
-                      </Text>
-                    )}
                   </View>
 
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
                     <TouchableOpacity
-                      style={[cancelBtn, { flex: 1 }]}
+                      disabled={isWorking}
+                      style={[cancelBtn, { flex: 1 }, isWorking ? { opacity: 0.6 } : null]}
                       activeOpacity={0.85}
                       onPress={() => {
                         setOrderModalVisible(false);
@@ -906,7 +1150,8 @@ export default function CustomerDetailsScreen({ route }) {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[primaryBtn(!canSubmitOrder), { flex: 1 }]}
+                      disabled={isWorking || !canSubmitOrder}
+                      style={[primaryBtn(isWorking || !canSubmitOrder), { flex: 1 }]}
                       activeOpacity={0.9}
                       onPress={createOrderDual}
                     >
@@ -923,7 +1168,7 @@ export default function CustomerDetailsScreen({ route }) {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ---------------- Receive Payment Modal ---------------- */}
+      {/* Receive Payment Modal */}
       <Modal
         visible={paymentModalVisible}
         animationType="slide"
@@ -961,12 +1206,13 @@ export default function CustomerDetailsScreen({ route }) {
                     onChangeText={(t) => setNewPayment({ ...newPayment, amount: t })}
                   />
 
-                  {/* ✅ Big list safe selector: open BankPickerModal */}
                   <Text style={{ fontSize: 12, color: '#777', marginBottom: 6 }}>Select Bank</Text>
                   <TouchableOpacity
+                    disabled={isWorking}
                     style={[
                       styles.input,
                       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+                      isWorking ? { opacity: 0.6 } : null,
                     ]}
                     onPress={() => setBankPickerVisible(true)}
                     activeOpacity={0.85}
@@ -986,29 +1232,10 @@ export default function CustomerDetailsScreen({ route }) {
                     onChangeText={(t) => setNewPayment({ ...newPayment, notes: t })}
                   />
 
-                  <View style={[styles.card, { marginTop: 6 }]}>
-                    <Text style={{ fontSize: 14, fontWeight: '900', marginBottom: 8 }}>Payment Overview</Text>
-
-                    <View style={styles.row}>
-                      <Text style={styles.label}>Customer Debit (BDT)</Text>
-                      <Text style={styles.value}>{formatCurrency(paymentAmountNum)}</Text>
-                    </View>
-
-                    <View style={[styles.row, { marginTop: 10 }]}>
-                      <Text style={styles.label}>Bank Credit (BDT)</Text>
-                      <Text style={styles.value}>{formatCurrency(paymentAmountNum)}</Text>
-                    </View>
-
-                    {!!newPayment.bankName && (
-                      <Text style={{ fontSize: 11, color: '#777', marginTop: 10 }}>
-                        Bank: {newPayment.bankName}
-                      </Text>
-                    )}
-                  </View>
-
                   <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
                     <TouchableOpacity
-                      style={[cancelBtn, { flex: 1 }]}
+                      disabled={isWorking}
+                      style={[cancelBtn, { flex: 1 }, isWorking ? { opacity: 0.6 } : null]}
                       activeOpacity={0.85}
                       onPress={() => {
                         setPaymentModalVisible(false);
@@ -1020,7 +1247,8 @@ export default function CustomerDetailsScreen({ route }) {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[primaryBtn(!canSubmitPayment), { flex: 1 }]}
+                      disabled={isWorking || !canSubmitPayment}
+                      style={[primaryBtn(isWorking || !canSubmitPayment), { flex: 1 }]}
                       activeOpacity={0.9}
                       onPress={receivePaymentDual}
                     >
@@ -1037,7 +1265,7 @@ export default function CustomerDetailsScreen({ route }) {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* ✅ Bank picker modal (big list safe) */}
+      {/* Bank picker modal */}
       <BankPickerModal
         visible={bankPickerVisible}
         onClose={() => setBankPickerVisible(false)}
@@ -1054,6 +1282,149 @@ export default function CustomerDetailsScreen({ route }) {
           setBankSearch('');
         }}
       />
+
+      {/* Edit Modal */}
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1, justifyContent: 'flex-end' }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={{ backgroundColor: 'rgba(0,0,0,0.4)', flex: 1 }} />
+
+          <View style={{ backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, maxHeight: '85%' }}>
+            <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="pencil" size={18} color="#111" />
+                <Text style={{ fontSize: 16, fontWeight: '800' }}>
+                  Edit {editingTx.type === 'order' ? 'Order' : 'Payment'}
+                </Text>
+              </View>
+
+              <Text style={{ fontSize: 12, color: '#777', marginTop: 4 }}>
+                {editingTx.type === 'order'
+                  ? `Supplier: ${editingTx.supplierName || ''} (locked)`
+                  : `Bank: ${editingTx.bankName || ''} (locked)`}
+              </Text>
+            </View>
+
+            <FlatList
+              data={[]}
+              renderItem={null}
+              keyExtractor={() => 'edit-form'}
+              keyboardShouldPersistTaps="always"
+              contentContainerStyle={{ padding: 16 }}
+              ListHeaderComponent={
+                <>
+                  {editingTx.type === 'order' ? (
+                    <>
+                      <Text style={{ fontSize: 12, color: '#777', marginBottom: 6 }}>RMB Amount</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={editingTx.rmbAmount}
+                        onChangeText={(t) => setEditingTx(prev => ({ ...prev, rmbAmount: t }))}
+                      />
+
+                      <Text style={{ fontSize: 12, color: '#777', marginBottom: 6 }}>Customer RMB Rate (BDT/RMB)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={editingTx.customerRmbRate}
+                        onChangeText={(t) => setEditingTx(prev => ({ ...prev, customerRmbRate: t }))}
+                      />
+
+                      <Text style={{ fontSize: 12, color: '#777', marginBottom: 6 }}>Supplier Rate (RMB per $)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={editingTx.supplierRate}
+                        onChangeText={(t) => setEditingTx(prev => ({ ...prev, supplierRate: t }))}
+                      />
+
+                      <View style={[styles.card, { marginTop: 8 }]}>
+                        <Text style={{ fontSize: 14, fontWeight: '900', marginBottom: 8 }}>New Overview</Text>
+
+                        <View style={styles.row}>
+                          <Text style={styles.label}>Customer Bill (BDT)</Text>
+                          <Text style={styles.value}>
+                            {formatCurrency((parseFloat(editingTx.rmbAmount) || 0) * (parseFloat(editingTx.customerRmbRate) || 0))}
+                          </Text>
+                        </View>
+
+                        <View style={[styles.row, { marginTop: 10 }]}>
+                          <Text style={styles.label}>Supplier Bill (USD)</Text>
+                          <Text style={styles.value}>
+                            {formatUSD(
+                              (parseFloat(editingTx.supplierRate) || 0) > 0
+                                ? (parseFloat(editingTx.rmbAmount) || 0) / (parseFloat(editingTx.supplierRate) || 1)
+                                : 0
+                            )}
+                          </Text>
+                        </View>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={{ fontSize: 12, color: '#777', marginBottom: 6 }}>Payment Amount (BDT)</Text>
+                      <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={editingTx.amount}
+                        onChangeText={(t) => setEditingTx(prev => ({ ...prev, amount: t }))}
+                      />
+                    </>
+                  )}
+
+                  <Text style={{ fontSize: 12, color: '#777', marginBottom: 6, marginTop: 10 }}>Notes (optional)</Text>
+                  <TextInput
+                    style={[styles.input, { height: 90, textAlignVertical: 'top' }]}
+                    multiline
+                    value={editingTx.notes}
+                    onChangeText={(t) => setEditingTx(prev => ({ ...prev, notes: t }))}
+                  />
+
+                  <Text style={{ fontSize: 12, color: '#777', marginBottom: 6, marginTop: 10 }}>Date</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="YYYY-MM-DD"
+                    value={editingTx.date}
+                    onChangeText={(t) => setEditingTx(prev => ({ ...prev, date: t }))}
+                  />
+
+                  <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                    <TouchableOpacity
+                      disabled={isWorking}
+                      style={[cancelBtn, { flex: 1 }, isWorking ? { opacity: 0.6 } : null]}
+                      activeOpacity={0.85}
+                      onPress={() => setEditModalVisible(false)}
+                    >
+                      <Icon name="close" size={18} color="#111" />
+                      <Text style={btnTextDark}>Cancel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      disabled={isWorking}
+                      style={[primaryBtn(isWorking), { flex: 1 }]}
+                      activeOpacity={0.9}
+                      onPress={saveEdit}
+                    >
+                      <Icon name="check-circle" size={18} color="white" />
+                      <Text style={btnTextLight}>Save Changes</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={{ height: 10 }} />
+                </>
+              }
+            />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }

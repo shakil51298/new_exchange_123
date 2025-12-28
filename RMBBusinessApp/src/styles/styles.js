@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
     },
     dhsBalanceLabel: {
       fontSize: 14,
-      color: 'rgba(255,255,255,0.9)',
+      color: 'rgba(3, 1, 1, 0.9)',
     },
     dhsBalanceAmount: {
       fontSize: 16,
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
     },
     conversionText: {
       fontSize: 12,
-      color: 'rgba(255,255,255,0.7)',
+      color: 'rgba(3, 1, 1, 0.9)',
       textAlign: 'center',
     },
     calculationBreakdown: {
@@ -830,7 +830,7 @@ const styles = StyleSheet.create({
   transactionCount: {
     fontSize: 12,
     color: '#6c757d',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'rgba(3, 1, 1, 0.9)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -1099,7 +1099,7 @@ const styles = StyleSheet.create({
   },
   transactionCount: {
     fontSize: 12,
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(3, 1, 1, 0.9)',
     marginTop: 5,
     textAlign: 'center',
   },

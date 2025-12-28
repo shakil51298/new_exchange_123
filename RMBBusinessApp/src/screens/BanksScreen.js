@@ -506,7 +506,7 @@ export default function BanksScreen({ navigation }) {
                       deleteBank(bank.id);
                     }}
                   >
-                    <Icon name="trash-can-outline" size={18} color="#FF3B30" />
+                    <Icon name="delete" size={18} color="#FF3B30" />
                   </TouchableOpacity>
                 </View>
               </View>
